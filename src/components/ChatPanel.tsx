@@ -1,20 +1,19 @@
 import { useState } from 'react'
-import type { CharacterProfile, CharacterState, ChatMessage } from '../types/ai'
-import { DEFAULT_CHARACTER_PROFILE } from '../types/ai'
+import type { CharacterState, ChatMessage } from '../types/ai'
 
 interface ChatPanelProps {
   messages: ChatMessage[]
   onSend: (text: string) => void
   characterState: CharacterState
-  profile: CharacterProfile
+  isThinking?: boolean
 }
 
-export function ChatPanel({ messages, onSend, characterState, profile }: ChatPanelProps) {
+export function ChatPanel({ messages, onSend, characterState, isThinking = false }: ChatPanelProps) {
   const [input, setInput] = useState('')
 
   const handleSubmit = () => {
     const trimmed = input.trim()
-    if (!trimmed) return
+    if (!trimmed || isThinking) return
     onSend(trimmed)
     setInput('')
   }
@@ -22,8 +21,8 @@ export function ChatPanel({ messages, onSend, characterState, profile }: ChatPan
   return (
     <div className="chat-panel">
       <div className="chat-header">
-        <span className="title">{profile.name}</span>
-        <span className="chat-status">{characterState.status}</span>
+        <span className="title">AI Companion</span>
+        <span className="chat-status">{isThinking ? 'Thinking...' : characterState.status}</span>
       </div>
 
       <div className="chat-messages">
@@ -40,7 +39,7 @@ export function ChatPanel({ messages, onSend, characterState, profile }: ChatPan
           className="chat-input"
           value={input}
           onChange={(event) => setInput(event.target.value)}
-          placeholder={`和 ${profile.name} 聊天...`}
+          placeholder="和 AI 聊天..."
           onKeyDown={(event) => {
             if (event.key === 'Enter' && !event.shiftKey) {
               event.preventDefault()
@@ -48,7 +47,9 @@ export function ChatPanel({ messages, onSend, characterState, profile }: ChatPan
             }
           }}
         />
-        <button className="send-btn" onClick={handleSubmit}>Send</button>
+        <button className="send-btn" onClick={handleSubmit} disabled={isThinking}>
+          {isThinking ? '...' : 'Send'}
+        </button>
       </div>
     </div>
   )
