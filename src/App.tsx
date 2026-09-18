@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { CharacterController } from './character/CharacterController'
+import { InteractionManager } from './character/InteractionManager'
 import { generateMockBrainResponse } from './ai/mockCharacterAI'
 import { ChatPanel } from './components/ChatPanel'
 import { Canvas } from './components/Canvas'
@@ -15,18 +17,16 @@ const initialMessages: ChatMessage[] = [
   },
 ]
 
-const initialCharacterState: CharacterState = {
-  emotion: 'happy',
-  expression: 'idle',
-  motion: 'idle',
-  lookAt: 'camera',
-  isTalking: false,
-  status: 'Ready',
-}
-
 export default function App() {
+  const controllerRef = useRef(new CharacterController())
+  const interactionManagerRef = useRef(new InteractionManager())
+
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
-  const [characterState, setCharacterState] = useState<CharacterState>(initialCharacterState)
+  const [characterState, setCharacterState] = useState<CharacterState>(controllerRef.current.getState())
+
+  const syncState = () => {
+    setCharacterState(controllerRef.current.getState())
+  }
 
   const handleSend = (text: string) => {
     const trimmed = text.trim()
@@ -42,6 +42,9 @@ export default function App() {
     setMessages((prev) => [...prev, userMessage])
 
     const response: AIBehaviorResponse = generateMockBrainResponse(trimmed)
+    controllerRef.current.applyBehavior(response)
+    controllerRef.current.setTalking(true)
+    syncState()
 
     const assistantMessage: ChatMessage = {
       id: `assistant-${Date.now()}`,
@@ -52,15 +55,22 @@ export default function App() {
 
     setMessages((prev) => [...prev, assistantMessage])
 
-    setCharacterState((prev) => ({
-      ...prev,
-      emotion: response.emotion ?? prev.emotion,
-      expression: response.expression ?? prev.expression,
-      motion: response.motion ?? prev.motion,
-      lookAt: response.lookAt ?? prev.lookAt,
-      isTalking: !!response.text,
-      status: response.actionPriority === 'high' ? 'Acting' : 'Listening',
-    }))
+    setTimeout(() => {
+      controllerRef.current.setTalking(false)
+      syncState()
+    }, 1200)
+  }
+
+  const handlePointerMove = () => {
+    const behavior = interactionManagerRef.current.handlePointerMove()
+    controllerRef.current.applyBehavior(behavior)
+    syncState()
+  }
+
+  const handleClick = (target: 'head' | 'body' | 'hand' | 'anywhere') => {
+    const behavior = interactionManagerRef.current.handleClick(target)
+    controllerRef.current.applyBehavior(behavior)
+    syncState()
   }
 
   return (
@@ -78,11 +88,16 @@ export default function App() {
           </div>
         </aside>
 
-        <div className="viewport-container">
-          <Canvas />
+        <div className="viewport-container" onMouseMove={handlePointerMove}>
+          <Canvas characterState={characterState} />
           <div className="character-badge">
             <span className="indicator" />
             {characterState.emotion}
+          </div>
+          <div className="interaction-row">
+            <button className="interaction-btn" onClick={() => handleClick('head')}>点头</button>
+            <button className="interaction-btn" onClick={() => handleClick('hand')}>挥手</button>
+            <button className="interaction-btn" onClick={() => handleClick('body')}>看看</button>
           </div>
         </div>
 
