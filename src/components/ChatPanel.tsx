@@ -1,13 +1,15 @@
 import { useState } from 'react'
-import type { CharacterState, ChatMessage } from '../types/ai'
+import type { CharacterProfile, CharacterState, ChatMessage } from '../types/ai'
+import { DEFAULT_CHARACTER_PROFILE } from '../types/ai'
 
 interface ChatPanelProps {
   messages: ChatMessage[]
   onSend: (text: string) => void
   characterState: CharacterState
+  profile: CharacterProfile
 }
 
-export function ChatPanel({ messages, onSend, characterState }: ChatPanelProps) {
+export function ChatPanel({ messages, onSend, characterState, profile }: ChatPanelProps) {
   const [input, setInput] = useState('')
 
   const handleSubmit = () => {
@@ -20,7 +22,7 @@ export function ChatPanel({ messages, onSend, characterState }: ChatPanelProps) 
   return (
     <div className="chat-panel">
       <div className="chat-header">
-        <span className="title">AI Companion</span>
+        <span className="title">{profile.name}</span>
         <span className="chat-status">{characterState.status}</span>
       </div>
 
@@ -38,7 +40,7 @@ export function ChatPanel({ messages, onSend, characterState }: ChatPanelProps) 
           className="chat-input"
           value={input}
           onChange={(event) => setInput(event.target.value)}
-          placeholder="和模型聊天..."
+          placeholder={`和 ${profile.name} 聊天...`}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && !event.shiftKey) {
               event.preventDefault()
