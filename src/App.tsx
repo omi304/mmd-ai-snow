@@ -1,34 +1,39 @@
 import { useRef, useState } from 'react'
 import { CharacterController } from './character/CharacterController'
-import { InteractionManager } from './character/InteractionManager'
-import { requestAIBehavior, fallbackAIBehavior } from './ai/aiClient'
+import { generateMockBrainResponse } from './ai/mockCharacterAI'
 import { ChatPanel } from './components/ChatPanel'
 import { Canvas } from './components/Canvas'
 import { TopMenu } from './components/TopMenu'
 import type { AIBehaviorResponse, CharacterState, ChatMessage } from './types/ai'
 import './App.css'
 
-const initialMessages: ChatMessage[] = [{ id: 'welcome', role: 'assistant', text: '你好，我已经准备好了。你可以和我聊天，也可以移动鼠标或点击场景和我互动。', timestamp: 'now' }]
+const initialMessages: ChatMessage[] = [
+  {
+    id: 'welcome',
+    role: 'assistant',
+    text: '你好，我已经准备好了。你可以点我、说话，或者直接试着给我一个动作要求。',
+    timestamp: 'now',
+  },
+]
 
 export default function App() {
   const controllerRef = useRef(new CharacterController())
-  const interactionManagerRef = useRef(new InteractionManager())
+
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [characterState, setCharacterState] = useState<CharacterState>(controllerRef.current.getState())
   const [isThinking, setIsThinking] = useState(false)
 
-  const syncState = () => setCharacterState(controllerRef.current.getState())
+  const syncState = () => {
+    setCharacterState(controllerRef.current.getState())
+  }
+
   const applyBehavior = (behavior: AIBehaviorResponse) => {
     controllerRef.current.applyBehavior(behavior)
     controllerRef.current.setTalking(Boolean(behavior.text))
     syncState()
-    window.setTimeout(() => {
-      controllerRef.current.setTalking(false)
-      syncState()
-    }, 1400)
   }
 
-  const handleSend = async (text: string) => {
+  const handleSend = (text: string) => {
     const trimmed = text.trim()
     if (!trimmed || isThinking) return
 
@@ -39,45 +44,72 @@ export default function App() {
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     }
 
-    const nextMessages = [...messages, userMessage]
-    setMessages(nextMessages)
-    setIsThinking(true)
+    const response: AIBehaviorResponse = generateMockBrainResponse(trimmed)
 
-    try {
-      const behavior = await requestAIBehavior(nextMessages)
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `assistant-${Date.now()}`,
-          role: 'assistant',
-          text: behavior.text,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ])
-      applyBehavior(behavior)
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `assistant-${Date.now()}`,
-          role: 'assistant',
-          text: fallbackAIBehavior.text,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ])
-      applyBehavior(fallbackAIBehavior)
-    } finally {
-      setIsThinking(false)
+    setMessages((prev) => [...prev, userMessage])
+    setIsThinking(true)
+    applyBehavior(response)
+
+    const assistantMessage: ChatMessage = {
+      id: `assistant-${Date.now()}`,
+      role: 'assistant',
+      text: response.text,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     }
+
+    setMessages((prev) => [...prev, assistantMessage])
+
+    setTimeout(() => {
+      controllerRef.current.setTalking(false)
+      syncState()
+      setIsThinking(false)
+    }, 1200)
   }
 
   const handlePointerMove = () => {
-    controllerRef.current.applyBehavior(interactionManagerRef.current.handlePointerMove())
+    controllerRef.current.applyBehavior({
+      emotion: 'happy',
+      expression: 'idle',
+      motion: 'look_around',
+      lookAt: 'mouse',
+      actionPriority: 'low',
+    })
     syncState()
   }
 
   const handleClick = (target: 'head' | 'body' | 'hand' | 'anywhere') => {
-    controllerRef.current.applyBehavior(interactionManagerRef.current.handleClick(target))
+    const map = {
+      head: {
+        emotion: 'happy',
+        expression: 'smile',
+        motion: 'nod',
+        lookAt: 'user',
+        actionPriority: 'medium',
+      },
+      body: {
+        emotion: 'happy',
+        expression: 'idle',
+        motion: 'look_around',
+        lookAt: 'camera',
+        actionPriority: 'medium',
+      },
+      hand: {
+        emotion: 'happy',
+        expression: 'wave',
+        motion: 'wave',
+        lookAt: 'user',
+        actionPriority: 'high',
+      },
+      anywhere: {
+        emotion: 'happy',
+        expression: 'smile',
+        motion: 'wave',
+        lookAt: 'user',
+        actionPriority: 'high',
+      },
+    }
+
+    controllerRef.current.applyBehavior(map[target])
     syncState()
   }
 
@@ -102,7 +134,6 @@ export default function App() {
             <span className="indicator" />
             {characterState.emotion}
           </div>
-
           <div className="interaction-row">
             <button className="interaction-btn" onClick={() => handleClick('head')}>点头</button>
             <button className="interaction-btn" onClick={() => handleClick('hand')}>挥手</button>
@@ -111,7 +142,7 @@ export default function App() {
         </div>
 
         <aside className="panel right-panel">
-          <div className="panel-header">AI Companion</div>
+          <div className="panel-header">Character</div>
           <div className="panel-body compact">
             <div className="stat-row">
               <span>Emotion</span>
@@ -141,7 +172,7 @@ export default function App() {
       </div>
 
       <div className="bottom-bar">
-        <span>{isThinking ? 'AI thinking...' : 'AI core ready'}</span>
+        <span>AI core disabled</span>
         <span>Mouse interaction ready</span>
         <span>MMD scene active</span>
       </div>
